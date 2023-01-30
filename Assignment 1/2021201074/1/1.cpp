@@ -26,7 +26,7 @@ bool isLastChunk(){
 class Mandlebrot{
     public:
         static bool mandle(Complex c, int k){
-            Complex next = c; 
+            Complex next = 0; 
             while(k-- and norm(next) <= 4){
                 next = pow(next, 2) + c;
             }
@@ -83,7 +83,9 @@ void solve(){
     
     Mandlebrot::getSet(res);
 
+    // cout << "rank=" << process_rank << ", chunk=" << chunk << endl;
     MPI_Gather(res, chunk, MPI_CXX_BOOL, grid, chunk, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+    // cout << "rank=" << process_rank << " sent" << endl;
 
     if(process_rank == 0){
         for(int i=0; i<total; i++){
