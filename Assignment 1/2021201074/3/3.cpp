@@ -9,7 +9,7 @@ long long cost[501][501] = {};
 int root[501][501] = {};
 int node_parent[501] = {};
 pii trees[501];
-int* input_buffer = nullptr;
+int input_buffer[1001];
 
 
 int n;
@@ -32,7 +32,7 @@ void optimalBST();
 void sorting();
 
 int main(int argc, char** argv){
-    system_input();
+    // system_input();
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &psize);
     MPI_Comm_rank(MPI_COMM_WORLD, &prank);
@@ -57,13 +57,13 @@ void fillParent(int i, int j, int rt = 0){
         return;
     }
     int k = root[i][j];
-    int val = trees[k].first;
+    int val = input_buffer[2*k];
     fillParent(i, k-1, val);
     node_parent[k] = rt;
     fillParent(k+1, j, val);
 }
 
-// unordered_map<int, pii> ump;
+void initialize();
 
 void shareInput(){
     if(isFirstProcess()){
@@ -71,20 +71,19 @@ void shareInput(){
         for(int i=0; i<n; i++){
             int u, v;
             cin >> u >> v;
-            trees[i].first = u;
-            trees[i].second = v;
+            input_buffer[2*i] = u;
+            input_buffer[2*i+1] = v;
         }
-        sorting();
-        input_buffer = new int[2*n];
-        for(int i=0; i<n; i++){
-            input_buffer[2*i] = trees[i].first; 
-            input_buffer[2*i+1] = trees[i].second;
-        }
+        // for(int i=0; i<n; i++){
+        //     input_buffer[2*i] = trees[i].first; 
+        //     input_buffer[2*i+1] = trees[i].second;
+        // }
     }
     MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    if(not isFirstProcess())
-        input_buffer = new int[2*n];
+    initialize();
+
+    sorting();
     
     MPI_Bcast(input_buffer, 2*n, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -92,10 +91,16 @@ void shareInput(){
 
 void initialize(){
     rows_per_process = ceil((double)n/psize);
-    if(isLastProcess() and n%rows_per_process)
-        rows_this_process = n%rows_per_process;
-    else
+    int j=n;
+    for(int i=0; i!=prank and j>0; i++,j-=rows_per_process){
+
+    }
+    if(j >= rows_per_process)
         rows_this_process = rows_per_process;
+    else if(j <= 0)
+        rows_this_process = 0;
+    else if(j < rows_per_process)
+        rows_this_process = j;
     
     row_st = prank*rows_per_process;
     row_ed = row_st + rows_this_process;
@@ -105,41 +110,118 @@ void solve(){
 
     shareInput();
 
-    initialize();
-
-    // cout << "Rank: " << prank << ", rows_per_process: " << rows_per_process << ", rows_this_process: " << rows_this_process << ", row_st: " << row_st << ", row_ed: " << row_ed << endl;
     optimalBST();
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // cout << "Rank: " << prank << ", done calculation" << endl;
     
     if(isFirstProcess()){
         cout << cost[0][n-1] << endl;
-        // for(int i=0; i<n; i++){
-        //     for(int j=0; j<n; j++)
-        //         cout << cost[i][j] << " ";
-        //     cout << endl;
-        // }
-        // cout << endl;
-        // for(int i=0; i<n; i++){
-        //     for(int j=0; j<n; j++)
-        //         cout << root[i][j] << " ";
-        //     cout << endl;
-        // }
+
         fillParent(0, n-1);
 
         for(int i=0; i<n; i++)
             cout << node_parent[i] << " ";
+        cout << endl;
     }
 
-    if(input_buffer)
-        delete[] input_buffer;
+}
+
+void merge(int ar2_st, int ar2_ed){
+    int ar1_st = 0, ar1_ed = ar2_st-1;
+    int m = ar1_ed - ar1_st + 1;
+    int n = ar2_ed - ar2_st + 1;
+    int tmp[m+n];
+    int k = 0;
+    int i=ar1_st,j=ar2_st;
+    while(i<=ar1_ed and j<=ar2_ed){
+        if(input_buffer[i] < input_buffer[j]){
+            tmp[k++] = input_buffer[i++];
+            tmp[k++] = input_buffer[i++];
+        }
+        else{
+            tmp[k++] = input_buffer[j++];
+            tmp[k++] = input_buffer[j++];
+        }
+    }
+    while(i<=ar1_ed){
+        tmp[k++] = input_buffer[i++];
+        tmp[k++] = input_buffer[i++];
+    }
+    while(j<=ar2_ed){
+        tmp[k++] = input_buffer[j++];
+        tmp[k++] = input_buffer[j++];
+    }
+    i=ar1_st;
+    k = 0;
+    while(i<=ar2_ed){
+        input_buffer[i++] = tmp[k++];
+        input_buffer[i++] = tmp[k++];
+    }
+}
+
+void merging(int* counts, int *displacements){
+    int k = 0;
+    for(int i=0; i<psize-1; i++){
+        merge(k + counts[i], k + counts[i] + counts[i+1]-1);
+        k += counts[i];
+    }
 }
 
 void sorting(){
 
-    sort(trees, trees+n);
+    int my_size = 2*rows_this_process;
+    
+    int my_buff[my_size];
+    int *counts = nullptr;
+    int *displacements = nullptr;
+
+    if(isFirstProcess()){
+        counts = new int[psize];
+        displacements = new int[psize];
+        int k = 2*n;
+        int i=0;
+        while(k > 0){
+            if(k < 2*rows_per_process)
+                counts[i] = k%(2*rows_per_process);
+            else
+                counts[i] = 2*rows_per_process;
+            displacements[i] = ((i!=0)?(displacements[i-1] + counts[i-1]):(0));
+
+            k -= counts[i];
+            i++;
+        }
+
+        while(i<psize){
+            counts[i] = 0;
+            displacements[i] = 2*n;
+            i++;
+        }
+
+    }
+
+    MPI_Scatterv(input_buffer, counts, displacements, MPI_INT, my_buff, my_size, MPI_INT, 0, MPI_COMM_WORLD);    
+
+    pii tree_buff[my_size/2];
+    for(int i=0; i<my_size/2; i++){
+        tree_buff[i] = {my_buff[2*i], my_buff[2*i+1]};
+    }
+
+    sort(tree_buff, tree_buff + my_size/2);
+    for(int i=0; i<my_size/2; i++){
+        my_buff[2*i] = tree_buff[i].first;
+        my_buff[2*i+1] = tree_buff[i].second;
+    }
+
+    MPI_Gatherv(my_buff, my_size, MPI_INT, input_buffer, counts, displacements, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if(isFirstProcess()){
+        merging(counts, displacements);
+        if(counts)
+            delete[] counts;
+        if(displacements)
+            delete[] displacements;
+    }
 
 }
 
