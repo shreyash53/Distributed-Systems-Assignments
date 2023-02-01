@@ -36,6 +36,8 @@ int row_start, row_end;
 vector<pym> particles_current;
 vector<pym> particles_out_of_bounds;
 
+bool swapFlag = false;
+
 bool isFirstProcess();
 bool isLastProcess();
 int* serialization(vector<pym>& vv);
@@ -83,7 +85,7 @@ void shareInput(){
 }
 
 void initialize(){
-    total = m*n;
+    total = m;
     rows_per_process = ceil((double)m/psize);
     if(prank == psize - 1 and total%rows_per_process)
         rows_this_process = total%rows_per_process;
@@ -93,7 +95,6 @@ void initialize(){
     row_start = prank*rows_per_process;
     row_end = row_start + rows_this_process - 1;
 
-    cout << "Rank : " << prank << ", row_per_process: " << rows_per_process << ", row_this_process: " << rows_this_process << ", row_start: " << row_start << ", row_end: " << row_end << endl;
 }
 
 bool valid_range(int x){
@@ -104,6 +105,32 @@ void select_points(){
     for(int i=0; i<3*k; i+=3){
         if(valid_range(input[i+1]))
             particles_current.push_back(pym(input[i], input[i+1], input[i+2]));
+    }
+}
+
+
+int tilt_direction(int dir){
+    switch(dir){
+        case DIR_DOWN:
+            return DIR_LEFT;
+        case DIR_LEFT:
+            return DIR_DOWN;
+        case DIR_RIGHT:
+            return DIR_UP;
+        case DIR_UP:
+            return DIR_RIGHT;
+    }
+    return -1;
+}
+
+void swap_values(){
+    if(swapFlag or n < m)
+        return;
+    swapFlag = true;
+    swap(n, m);
+    for(int i=0; i<3*k; i+=3){
+        swap(input[i], input[i+1]);
+        input[i+2] = tilt_direction(input[i+2]);
     }
 }
 
@@ -119,7 +146,10 @@ void solve(){
             input[i+1] = y;
             input[i+2] = c;
         }
+
+        swap_values();
     }
+    
 
     shareInput();
 
@@ -128,7 +158,6 @@ void solve(){
     select_points();
 
     SimulationOperation obj;
-    // for(int i=0; i<100; i++){
     obj.startSimulation();
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -166,6 +195,8 @@ void solve(){
         delete[] buff;
 
     if(isFirstProcess()){
+        if(swapFlag)
+            swap_values();
         //displaying output
         obj.displayPoints(input);
     }
@@ -180,7 +211,7 @@ void system(){
 
 int main(int argc, char** argv){
     
-    system();
+    // system();
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &psize);
     MPI_Comm_rank(MPI_COMM_WORLD, &prank);
@@ -190,17 +221,9 @@ int main(int argc, char** argv){
 }
 
 void SimulationOperation::displayPoints(int input[]){
-    // for(int i=0; i<3*k; i+=3){
-    //     for(int j=0; j<3; j++)
-    //         if(j == 2)
-    //         cout << (char)position[i+j] << " ";
-    //         else
-    //         cout << position[i+j] << " ";
-    //     cout << endl;
-    // }
+
     multimap<pii, char> val;
     for(int i=0; i<3*k; i+=3){
-        // val[make_pair(input[i], input[i+1])] = (char)input[i+2];
         val.insert({{input[i], input[i+1]}, (char)input[i+2]});
     }
     for(auto& v: val)
@@ -210,7 +233,6 @@ void SimulationOperation::displayPoints(int input[]){
 void SimulationOperation::startSimulation(){
     
     while(t--){
-        // cout << "process " << prank << " - " << t << " iteration" << endl;
         //checking for collision
         checkCollision();
 
@@ -220,12 +242,7 @@ void SimulationOperation::startSimulation(){
         //sharing the updated points with other process
         sharePoints();
     }
-    // if(isFirstProcess()){
-    //     cout << "ending now..." << endl;
-    //     for(auto& v: particles_current){
-    //         cout << v.x << " " << v.y << " " << (char)v.dir << endl;
-    //     }
-    // }
+
 }
 
 int* serialization(vector<pym>& vv){
@@ -295,7 +312,6 @@ vector<pym> recieve_msg(int dir){
     bool flag;
     MPI_Recv(&flag, 1, MPI_CXX_BOOL, prank+dir, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    // cout << "process " << prank << " iteration " << t << " - " << "half recv " << flag << endl;
 
     if(not flag)
         return {};
@@ -308,7 +324,6 @@ vector<pym> recieve_msg(int dir){
     // attributes of the incoming message. Get the message size
     int amnt;
     MPI_Get_count(&status, MPI_INT, &amnt);
-    // cout << "process " << prank << " iteration " << t << " - " << "full recv " << amnt << endl;
 
     int *buff = new int[amnt];
     
@@ -327,13 +342,11 @@ void sharePoints(){
     if((isFirstProcess() and not above.empty()) or (isLastProcess() and not below.empty()))     //not possible
         cout << "*****ERROR STATEMENT****** " << "\n" << "while share points, found points wrongly segregated, in process rank " << prank << endl;
 
-    // cout << "process " << prank << " - " << "iteration " << t << " " << "now sharing" << endl;
     //sending msg in one direction - right
     send_message(below, 1);
 
     below.clear();      // clear vector below
 
-    // cout << "process " << prank << " - " << "iteration " << t << " " << "half done sharing" << endl;
     //recieving msg from opposite side - left
     auto rec_left = recieve_msg(-1);
 
@@ -352,7 +365,6 @@ void sharePoints(){
     if(not rec_right.empty())
         particles_current.insert(particles_current.end(), rec_right.begin(), rec_right.end());
     rec_right.clear();
-    // cout << "process " << prank << " - " << "iteration " << t << " " << "finished sharing" << endl;
 
 }
 
