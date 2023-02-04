@@ -22,7 +22,7 @@ int row_st, row_ed;
 unordered_map<int, unordered_map<int, vector<long long>>> values_here;
 
 void system_input(){
-    freopen("input.txt","r",stdin);
+    freopen("../../input.txt","r",stdin);
 	// freopen("output.txt","w",stdout);
 }
 
@@ -32,7 +32,7 @@ void optimalBST();
 void sorting();
 
 int main(int argc, char** argv){
-    // system_input();
+    system_input();
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &psize);
     MPI_Comm_rank(MPI_COMM_WORLD, &prank);
