@@ -7,7 +7,7 @@ using namespace std;
 using Complex = complex<double>;
 
 int input[3];
-int total_processes, process_rank, n=16, m=16, k=1000;
+int total_processes, process_rank, n=2, m=2, k=100;
 
 int chunk, offset, total;
 double xdiff, ydiff;
@@ -83,10 +83,39 @@ void solve(){
     
     Mandlebrot::getSet(res);
 
-    // cout << "rank=" << process_rank << ", chunk=" << chunk << endl;
-    MPI_Gather(res, chunk, MPI_CXX_BOOL, grid, chunk, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
-    // cout << "rank=" << process_rank << " sent" << endl;
+    int *counts = nullptr;
+    int *displacements = nullptr;
 
+    if(process_rank == 0){
+        counts = new int[total_processes];
+        displacements = new int[total_processes];
+        int k = m*n;
+        int i=0;
+        while(k > 0){
+            if(k < chunk)
+                counts[i] = k%(chunk);
+            else
+                counts[i] = chunk;
+            displacements[i] = ((i!=0)?(displacements[i-1] + counts[i-1]):(0));
+
+            k -= counts[i];
+            i++;
+        }
+
+        while(i<total_processes){
+            counts[i] = 0;
+            displacements[i] = m*n;
+            i++;
+        }
+    }
+
+    // cout << "rank=" << process_rank << ", chunk=" << chunk << endl;
+    MPI_Gatherv(res, chunk, MPI_CXX_BOOL, grid, counts, displacements, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+    // cout << "rank=" << process_rank << " sent" << endl;
+    if(counts)
+        delete[] counts;
+    if(displacements)
+        delete[] displacements;
     if(process_rank == 0){
         for(int i=0; i<total; i++){
             cout << grid[i] << " ";
