@@ -1,0 +1,68 @@
+sudo docker exec namenode hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+  -input /input/input.txt \
+  -output /output \
+  -mapper "python3 mapper.py" \
+  -reducer "python3 reducer.py" \
+  -file ./mapper.py \
+  -file ./reducer.py
+
+
+sudo docker exec namenode hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+  -input /input/input.txt \
+  -output /output \
+  -mapper "python3 mapper.py" \
+  -reducer "python3 reducer.py" \
+  -files mapper.py,reducer.py
+  
+  
+  hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+     -input /input/input.txt \
+     -output /output \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -file ./mapper.py \
+     -file ./reducer.py
+
+hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+     -input /in1/input.txt \
+     -output /out1/ \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -file /1/mapper.py \
+     -file /1/reducer.py
+
+hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+     -input /in1/input.txt \
+     -output /out5 \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -file ./mapper.py \
+     -file ./reducer.py
+     
+hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+     -input /input/input.txt \
+     -output /output \
+     -mapper "python3 map.py" \
+     -reducer "python3 red.py" \
+     -file ./map.py \
+     -file ./red.py \
+     -D mapreduce.job.reduces=4
+     
+sudo docker exec namenode hadoop jar /opt/hadoop-3.2.4/share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar \
+     -input /input/input.txt \
+     -output /output \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -file ./mapper.py \
+     -file ./reducer.py
+     
+     
+     sudo docker cp "/home/sensei/IIITH/Spring 2023/Distributed Systems/Assignments/Assignment 2/2021201074/2021201074_2/input.txt" namenode:/input2.txt
+
+sudo docker exec namenode hdfs dfs -copyFromLocal /input2.txt /input/input2.txt
+
+sudo docker cp "/home/sensei/IIITH/Spring 2023/Distributed Systems/Assignments/Assignment 2/2021201074/2021201074_2/mapper2.py" namenode:/mapper2.py
+
+sudo docker cp "/home/sensei/IIITH/Spring 2023/Distributed Systems/Assignments/Assignment 2/2021201074/2021201074_2/reducer2.py" namenode:/reducer2.py
+
+
